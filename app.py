@@ -235,7 +235,7 @@ st.subheader("Model Insights")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.image("visuals/confusion_matrix.png", caption="Confusion Matrix")
+    st.image("images\confusion_matrix.png", caption="Confusion Matrix")
 
 with col2:
-    st.image("visuals/feature_importance.png", caption="Feature Importance")
+    st.image("images\feature_importance.png", caption="Feature Importance")
