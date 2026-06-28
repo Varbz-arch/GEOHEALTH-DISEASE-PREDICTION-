@@ -202,7 +202,7 @@ import joblib
 from PIL import Image
 
 # Load model
-model = joblib.load("model\\model.pkl")
+model = joblib.load("model/model.pkl")
 
 st.set_page_config(page_title="GeoHealth Disease Predictor", layout="centered")
 
@@ -235,7 +235,7 @@ st.subheader("Model Insights")
 col1, col2 = st.columns(2)
 
 with col1:
-    st.image("images\confusion_matrix.png", caption="Confusion Matrix")
+    st.image("images/confusion_matrix.png", caption="Confusion Matrix")
 
 with col2:
-    st.image("images\feature_importance.png", caption="Feature Importance")
+    st.image("images/feature_importance.png", caption="Feature Importance")
