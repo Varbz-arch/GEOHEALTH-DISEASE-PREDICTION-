@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GeoHealth AI — Disease Risk Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #060b18;
+  --surface:    rgba(255,255,255,0.035);
+  --surface-2:  rgba(255,255,255,0.055);
+  --border:     rgba(255,255,255,0.07);
+  --border-2:   rgba(255,255,255,0.12);
+  --indigo:     #6366f1;
+  --indigo-2:   #818cf8;
+  --violet:     #8b5cf6;
+  --cyan:       #22d3ee;
+  --text:       #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim:   #94a3b8;
+  --radius:     16px;
+  --radius-sm:  10px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Atmospheric background ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(99,102,241,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 110%, rgba(139,92,246,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(34,211,238,0.04) 0%, transparent 70%);
+}
+
+/* ── Grid texture ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.025;
+  background-image: linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.page-wrap {
+  position: relative; z-index: 1;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 20px 80px;
+}
+
+/* ── Header ── */
+.header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99,102,241,0.12);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--indigo-2);
+  margin-bottom: 20px;
+}
+
+.pill-dot {
+  width: 6px; height: 6px;
+  background: var(--indigo);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--indigo);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.headline {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(32px, 6vw, 48px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.headline span {
+  background: linear-gradient(135deg, var(--indigo-2), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subheading {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: border-color 0.3s;
+}
+
+.card:hover { border-color: var(--border-2); }
+
+.card-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Form ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.field select {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field select:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+.field select option { background: #1e293b; color: var(--text); }
+
+.field-error {
+  font-size: 11px;
+  color: #f87171;
+  margin-top: 5px;
+  display: none;
+}
+
+/* ── Climate chips ── */
+.climate-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  min-height: 34px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 12px;
+  color: var(--text-dim);
+  animation: chip-in 0.25s ease both;
+}
+@keyframes chip-in {
+  from { opacity: 0; transform: scale(0.92) translateY(4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.chip strong { color: var(--text); font-weight: 500; }
+
+/* ── Predict button ── */
+.predict-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--indigo) 0%, var(--violet) 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 24px rgba(99,102,241,0.3);
+}
+
+.predict-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.predict-btn:hover:not(:disabled)::before { opacity: 1; }
+.predict-btn:hover:not(:disabled) { box-shadow: 0 6px 32px rgba(99,102,241,0.45); transform: translateY(-1px); }
+.predict-btn:active:not(:disabled) { transform: translateY(0); }
+.predict-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error banner ── */
+.error-banner {
+  display: none;
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #fca5a5;
+  margin-bottom: 16px;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Results ── */
+.results-wrap {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  display: none;
+}
+
+/* Summary card */
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--indigo), var(--violet));
+  border-radius: 3px 0 0 3px;
+}
+
+.disease-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.disease-prob {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.risk-low    { background: rgba(34,197,94,0.12);  border: 1px solid rgba(34,197,94,0.25);  color: #4ade80; }
+.risk-medium { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.25); color: #fbbf24; }
+.risk-high   { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.25);  color: #f87171; }
+
+/* Probability bars */
+.prob-item {
+  margin-bottom: 18px;
+}
+.prob-item:last-child { margin-bottom: 0; }
+
+.prob-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.prob-disease-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.prob-pct { font-size: 13px; font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.prob-track {
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.prob-fill {
+  height: 100%;
+  border-radius: 999px;
+  width: 0;
+  transition: width 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Suggestion cards */
+.suggestion-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(99,102,241,0.05);
+  border: 1px solid rgba(99,102,241,0.12);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  animation: fadeUp 0.4s ease both;
+}
+
+.suggestion-item:last-child { margin-bottom: 0; }
+
+.suggestion-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Chart canvas */
+#bar-chart { width: 100% !important; }
+
+/* Fade in animation for result sections */
+.fade-in {
+  animation: fadeUp 0.4s ease both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-delay-1 { animation-delay: 0.08s; }
+.fade-delay-2 { animation-delay: 0.16s; }
+.fade-delay-3 { animation-delay: 0.24s; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="pill"><span class="pill-dot"></span> AI-Powered Prediction</div>
+    <h1 class="headline">GeoHealth <span>AI</span></h1>
+    <p class="subheading">Disease risk prediction for India — select your state and month to get started.</p>
+  </header>
+
+  <!-- Input Card -->
+  <div class="card" style="margin-bottom: 12px;">
+    <div class="card-label">Location &amp; Period</div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="state">State / Region</label>
+        <select id="state">
+          <option value="">Select state…</option>
+          <option>Andhra Pradesh</option>
+          <option>Arunachal Pradesh</option>
+          <option>Assam</option>
+          <option>Bihar</option>
+          <option>Chhattisgarh</option>
+          <option>Goa</option>
+          <option>Gujarat</option>
+          <option>Haryana</option>
+          <option>Himachal Pradesh</option>
+          <option>Jharkhand</option>
+          <option>Karnataka</option>
+          <option>Kerala</option>
+          <option>Madhya Pradesh</option>
+          <option>Maharashtra</option>
+          <option>Manipur</option>
+          <option>Meghalaya</option>
+          <option>Mizoram</option>
+          <option>Nagaland</option>
+          <option>Odisha</option>
+          <option>Punjab</option>
+          <option>Rajasthan</option>
+          <option>Sikkim</option>
+          <option>Tamil Nadu</option>
+          <option>Telangana</option>
+          <option>Tripura</option>
+          <option>Uttar Pradesh</option>
+          <option>Uttarakhand</option>
+          <option>West Bengal</option>
+          <option>Delhi</option>
+        </select>
+        <p class="field-error" id="state-err">Please select a state.</p>
+      </div>
+      <div class="field">
+        <label for="month">Month</label>
+        <select id="month">
+          <option value="">Select month…</option>
+          <option>January</option><option>February</option><option>March</option>
+          <option>April</option><option>May</option><option>June</option>
+          <option>July</option><option>August</option><option>September</option>
+          <option>October</option><option>November</option><option>December</option>
+        </select>
+        <p class="field-error" id="month-err">Please select a month.</p>
+      </div>
+    </div>
+
+    <!-- Climate chips -->
+    <div class="climate-strip" id="climate-strip"></div>
+
+    <!-- Error banner -->
+    <div class="error-banner" id="error-banner">
+      <svg width="16" height="16" fill="none" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="7" stroke="#f87171" stroke-width="1.5"/>
+        <path d="M8 4.5v4" stroke="#f87171" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="8" cy="11" r="0.75" fill="#f87171"/>
+      </svg>
+      <span id="error-text">Something went wrong. Please try again.</span>
+    </div>
+
+    <button class="predict-btn" id="predict-btn" onclick="runPrediction()">
+      <span id="btn-label">Predict Disease Risk</span>
+    </button>
+  </div>
+
+  <!-- Results -->
+  <div class="results-wrap" id="results-wrap">
+
+    <!-- Summary -->
+    <div class="card summary-card fade-in" id="summary-card">
+      <div>
+        <p style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;">Top Predicted Disease</p>
+        <div class="disease-name" id="r-disease">—</div>
+        <div class="disease-prob" id="r-prob">—</div>
+      </div>
+      <div style="text-align:right;">
+        <p style="font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Risk Level</p>
+        <span class="risk-badge risk-low" id="r-risk">—</span>
+      </div>
+    </div>
+
+    <!-- Probability bars -->
+    <div class="card fade-in fade-delay-1" id="probs-card">
+      <div class="card-label">Top 3 Predictions</div>
+      <div id="probs-list"></div>
+    </div>
+
+    <!-- Suggestions -->
+    <div class="card fade-in fade-delay-2" id="suggestions-card">
+      <div class="card-label">
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span class="relative" style="position:relative;display:inline-block;width:8px;height:8px;">
+            <span style="position:absolute;inset:0;border-radius:50%;background:var(--indigo);animation:pulse-dot 2s ease-in-out infinite;"></span>
+          </span>
+          Health Advisory &amp; Prevention
+        </span>
+      </div>
+      <div id="suggestions-list"></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card fade-in fade-delay-3">
+      <div class="card-label">Probability Comparison</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="bar-chart"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Climate lookup data ──────────────────────────────────────────────────────
+const MONTH_IDX = {
+  january:0, february:1, march:2, april:3, may:4, june:5,
+  july:6, august:7, september:8, october:9, november:10, december:11
+};
+
+const STATE_DATA = {
+  "andhra pradesh":     { t:[28,30,33,36,38,34,30,29,30,30,28,27], h:[72,68,60,55,58,72,80,82,78,74,70,68], r:[10,8,12,20,30,60,120,140,130,80,40,15],  l:[1.8,1.6,1.5,1.4,1.6,2.2,3.0,3.2,3.0,2.5,2.0,1.8], p:49386799  },
+  "arunachal pradesh":  { t:[10,12,16,20,22,24,25,25,23,19,14,10], h:[78,76,74,76,80,88,92,92,88,82,76,74], r:[40,50,80,120,150,250,320,310,260,120,50,30], l:[3.5,3.2,3.0,3.2,3.8,4.5,5.0,5.0,4.8,4.0,3.6,3.4], p:1383727   },
+  "assam":              { t:[15,18,22,26,28,30,30,30,28,26,20,15], h:[82,80,76,78,80,88,92,92,88,84,80,78], r:[20,25,55,100,160,280,350,320,250,120,30,10], l:[3.2,3.0,2.8,3.0,3.5,4.2,4.8,4.8,4.5,3.8,3.2,3.0], p:31205576  },
+  "bihar":              { t:[14,17,23,30,35,34,31,30,30,28,20,15], h:[70,65,55,50,55,72,82,84,78,68,60,65], r:[15,12,10,8,25,80,180,220,180,60,15,8],   l:[1.2,1.0,0.9,0.8,1.0,1.8,2.8,3.0,2.8,2.0,1.4,1.2], p:104099452 },
+  "chhattisgarh":       { t:[18,21,26,32,36,33,29,28,29,28,22,18], h:[65,60,52,45,52,72,84,86,78,65,55,60], r:[12,10,15,12,25,120,280,310,240,60,20,10], l:[1.8,1.5,1.3,1.2,1.4,2.2,3.4,3.6,3.2,2.4,1.8,1.6], p:25545198  },
+  "goa":                { t:[26,27,29,31,32,29,27,27,27,28,28,26], h:[70,68,68,70,76,88,92,92,88,82,76,70], r:[5,2,3,8,40,500,850,680,280,80,20,5],    l:[2.2,2.0,1.8,1.8,2.0,3.0,3.8,3.8,3.5,3.0,2.5,2.2], p:1458545   },
+  "gujarat":            { t:[20,22,26,32,36,35,31,30,30,30,24,20], h:[60,56,50,44,48,68,80,82,72,60,52,56], r:[5,3,3,2,8,55,180,200,110,30,8,5],    l:[1.0,0.8,0.7,0.6,0.7,1.5,2.6,2.8,2.4,1.6,1.0,0.9], p:60439692  },
+  "haryana":            { t:[12,15,20,27,33,36,33,32,30,26,18,12], h:[72,65,55,42,38,52,70,72,60,52,55,68], r:[22,18,14,8,14,40,120,110,80,20,8,12],   l:[1.2,1.0,0.9,0.8,0.9,1.4,2.2,2.4,2.0,1.5,1.2,1.1], p:25351462  },
+  "himachal pradesh":   { t:[4,6,10,15,20,24,22,21,18,13,7,3],     h:[74,70,62,56,54,68,80,82,74,66,62,70], r:[50,60,60,30,30,60,160,180,120,30,20,40],  l:[1.4,1.2,1.2,1.5,2.0,2.8,3.2,3.2,2.8,2.0,1.6,1.4], p:6864602   },
+  "jharkhand":          { t:[14,17,23,30,34,32,29,28,29,27,20,14], h:[68,62,54,48,54,74,86,88,80,66,56,62], r:[18,15,18,15,35,120,280,320,250,70,18,10], l:[1.5,1.2,1.1,1.0,1.2,2.0,3.2,3.4,3.0,2.2,1.6,1.4], p:32988134  },
+  "karnataka":          { t:[24,26,29,32,33,28,26,26,27,27,25,23], h:[68,62,58,56,60,74,82,82,78,72,66,64], r:[5,8,12,30,70,90,130,130,180,160,40,10],   l:[2.0,1.8,1.6,1.5,1.8,2.5,3.2,3.2,3.0,2.6,2.2,1.9], p:61095297  },
+  "kerala":             { t:[27,28,30,31,30,27,26,26,27,27,27,27], h:[76,72,70,72,80,88,90,88,86,84,80,76], r:[20,15,30,80,180,650,650,400,270,250,150,40], l:[3.5,3.2,3.0,3.0,3.5,4.5,4.8,4.6,4.4,4.2,3.8,3.5], p:33406061  },
+  "madhya pradesh":     { t:[15,18,24,31,36,34,29,28,29,28,21,16], h:[66,58,48,38,42,65,80,82,72,58,48,58], r:[12,10,12,5,15,100,280,310,200,50,15,8],   l:[1.2,0.9,0.8,0.7,0.8,1.8,3.0,3.2,2.8,1.8,1.2,1.0], p:72626809  },
+  "maharashtra":        { t:[22,24,28,33,36,32,28,27,28,29,26,22], h:[62,58,52,44,48,68,80,82,74,64,56,58], r:[5,4,5,8,20,120,280,260,180,60,20,8],    l:[1.4,1.2,1.0,0.9,1.0,2.0,3.2,3.4,3.0,2.2,1.6,1.4], p:112374333 },
+  "manipur":            { t:[12,14,18,22,24,26,26,26,24,20,15,11], h:[76,74,72,76,80,86,90,90,86,80,74,72], r:[20,25,55,100,140,210,260,240,200,90,30,15], l:[2.8,2.6,2.4,2.6,3.0,3.8,4.2,4.2,4.0,3.4,3.0,2.8], p:2855794   },
+  "meghalaya":          { t:[10,12,16,20,22,24,25,25,23,18,13,9],  h:[82,80,78,80,84,90,94,94,90,84,78,76], r:[30,40,80,200,360,620,720,660,480,200,50,20], l:[3.8,3.5,3.2,3.5,4.0,4.8,5.2,5.2,5.0,4.4,3.8,3.6], p:2966889   },
+  "mizoram":            { t:[14,16,20,23,25,26,26,26,24,21,16,13], h:[78,76,74,78,82,88,92,92,88,82,76,74], r:[25,35,60,130,200,340,400,380,300,120,40,18], l:[3.2,3.0,2.8,3.0,3.5,4.2,4.6,4.6,4.4,3.8,3.2,3.0], p:1097206   },
+  "nagaland":           { t:[11,13,17,21,23,25,25,25,23,18,13,10], h:[76,74,72,76,80,86,90,90,86,80,74,72], r:[22,28,60,110,150,220,270,250,210,100,35,18], l:[2.8,2.6,2.4,2.6,3.0,3.6,4.0,4.0,3.8,3.2,2.8,2.6], p:1978502   },
+  "odisha":             { t:[20,23,28,33,36,33,30,29,30,29,24,20], h:[72,68,60,56,62,76,84,84,80,74,68,68], r:[15,18,20,22,50,140,280,320,240,120,40,15],  l:[1.8,1.6,1.4,1.3,1.6,2.4,3.4,3.6,3.2,2.6,2.0,1.8], p:41974218  },
+  "punjab":             { t:[10,13,18,26,32,36,33,32,30,26,17,11], h:[74,68,56,44,38,48,64,68,58,50,54,70], r:[26,22,20,10,14,30,110,100,70,15,6,14],    l:[1.4,1.2,1.0,0.8,0.9,1.4,2.0,2.2,1.8,1.5,1.3,1.3], p:27743338  },
+  "rajasthan":          { t:[14,17,23,30,36,38,34,32,32,30,22,14], h:[50,44,36,26,24,38,60,62,50,38,32,44], r:[8,6,5,3,5,20,80,90,50,10,4,5],     l:[0.6,0.5,0.4,0.3,0.3,0.8,1.8,2.0,1.6,0.9,0.6,0.5], p:68548437  },
+  "sikkim":             { t:[6,8,12,15,18,20,20,20,18,14,9,5],     h:[78,74,70,72,78,86,90,90,86,80,74,72], r:[28,38,58,110,180,380,450,420,340,130,42,20], l:[2.5,2.2,2.0,2.2,2.8,3.6,4.0,4.0,3.8,3.2,2.6,2.4], p:610577    },
+  "tamil nadu":         { t:[26,28,30,33,36,37,35,34,33,30,27,25], h:[72,70,64,60,60,62,70,72,76,80,76,72], r:[36,22,10,14,40,30,60,90,140,310,340,140],  l:[2.0,1.8,1.6,1.4,1.5,1.8,2.2,2.4,2.6,2.8,2.5,2.2], p:72147030  },
+  "telangana":          { t:[24,27,31,36,38,34,29,28,29,29,26,24], h:[62,56,48,44,50,70,82,82,76,68,62,60], r:[6,5,10,18,30,80,160,180,140,80,30,10],    l:[1.4,1.2,1.0,0.9,1.0,1.8,2.8,3.0,2.6,2.0,1.5,1.3], p:35003674  },
+  "tripura":            { t:[16,18,23,27,29,30,30,30,28,25,19,15], h:[82,80,76,80,84,88,92,92,88,84,80,78], r:[18,22,50,100,160,280,340,310,250,120,30,14], l:[3.0,2.8,2.6,2.8,3.2,3.8,4.2,4.2,4.0,3.5,3.0,2.8], p:3673917   },
+  "uttar pradesh":      { t:[13,16,22,29,35,36,32,31,30,27,19,13], h:[72,66,54,44,42,60,78,80,72,60,54,66], r:[18,14,10,6,14,60,180,220,160,40,12,10],   l:[1.2,1.0,0.9,0.7,0.8,1.4,2.4,2.6,2.2,1.6,1.2,1.1], p:199812341 },
+  "uttarakhand":        { t:[6,8,12,18,22,24,22,21,19,14,8,5],     h:[72,68,60,54,56,72,84,86,78,66,60,68], r:[28,30,30,20,30,80,220,240,180,50,20,28],  l:[1.8,1.5,1.4,1.6,2.2,3.0,3.8,4.0,3.5,2.5,1.8,1.6], p:10086292  },
+  "west bengal":        { t:[18,21,26,30,32,32,30,29,30,28,23,18], h:[76,72,66,68,74,84,88,88,84,80,74,72], r:[15,18,25,40,100,220,320,310,240,160,50,15], l:[2.2,2.0,1.8,1.8,2.2,3.0,3.8,3.8,3.5,3.0,2.5,2.2], p:91276115  },
+  "delhi":              { t:[13,16,22,29,35,36,31,30,29,26,18,12], h:[70,62,50,38,34,52,70,72,60,50,52,64], r:[18,16,12,6,10,50,180,200,120,14,6,10],    l:[0.8,0.6,0.5,0.4,0.5,1.0,1.8,2.0,1.6,1.0,0.7,0.7], p:16787941  },
+};
+
+// ── Suggestion library ───────────────────────────────────────────────────────
+const SUGGESTIONS = {
+  Dengue: [
+    { icon: '🦟', text: 'Use mosquito nets and repellents — Dengue mosquitoes bite during daytime.' },
+    { icon: '🪣', text: 'Eliminate standing water around your home: check pots, tyres, and gutters.' },
+    { icon: '🩸', text: 'Watch for high fever with severe headache and joint pain. Seek care within 24 hrs.' },
+    { icon: '💧', text: 'Stay well-hydrated. Avoid aspirin or ibuprofen — use paracetamol only.' },
+  ],
+  Malaria: [
+    { icon: '🦟', text: 'Sleep under insecticide-treated bed nets (ITNs), especially in rural/forested areas.' },
+    { icon: '🌿', text: 'Avoid outdoor activity between dusk and dawn when Anopheles mosquitoes are active.' },
+    { icon: '🏥', text: 'Chills, fever and sweating? Get a rapid malaria diagnostic test immediately.' },
+    { icon: '💊', text: 'Complete your full course of antimalarials — do not stop when you feel better.' },
+  ],
+  Cholera: [
+    { icon: '🚰', text: 'Drink only boiled or purified water. Avoid tap water, ice, and street food.' },
+    { icon: '🧼', text: 'Wash hands thoroughly with soap — especially before eating and after using the toilet.' },
+    { icon: '🍽️', text: 'Eat freshly cooked, hot food. Avoid raw vegetables and seafood during outbreaks.' },
+    { icon: '🏥', text: 'Severe watery diarrhoea requires immediate ORS (oral rehydration salts) and hospital care.' },
+  ],
+  Typhoid: [
+    { icon: '💉', text: 'Get vaccinated — typhoid vaccine is effective and recommended in endemic areas.' },
+    { icon: '🚰', text: 'Only consume safe, treated water. Boil or use a certified filter.' },
+    { icon: '🧼', text: 'Rigorous hand hygiene before meals is the single most effective prevention step.' },
+    { icon: '🌡️', text: 'Persistent fever over 38.5°C for more than 3 days: seek a Widal / blood culture test.' },
+  ],
+  Heatstroke: [
+    { icon: '🌡️', text: 'Avoid outdoor activity between 11 AM and 4 PM during peak summer months.' },
+    { icon: '💧', text: 'Drink at least 3–4 litres of water daily. Carry water when going outdoors.' },
+    { icon: '👒', text: 'Wear light-coloured, loose cotton clothing and use hats or umbrellas.' },
+    { icon: '❄️', text: 'If someone collapses from heat: move to shade, apply cool water, call emergency services.' },
+  ],
+};
+
+const DISEASE_COLORS = {
+  Dengue:     { bar: '#f472b6', glow: 'rgba(244,114,182,0.3)' },
+  Malaria:    { bar: '#34d399', glow: 'rgba(52,211,153,0.3)'  },
+  Cholera:    { bar: '#60a5fa', glow: 'rgba(96,165,250,0.3)'  },
+  Typhoid:    { bar: '#fbbf24', glow: 'rgba(251,191,36,0.3)'  },
+  Heatstroke: { bar: '#f87171', glow: 'rgba(248,113,113,0.3)' },
+};
+
+// ── Climate preview ──────────────────────────────────────────────────────────
+function resolveClimate(state, month) {
+  const sd = STATE_DATA[state.toLowerCase()];
+  if (!sd) return null;
+  const mi = MONTH_IDX[month.toLowerCase()];
+  if (mi === undefined) return null;
+  return { temp: sd.t[mi], humidity: sd.h[mi], rainfall: sd.r[mi], lai: sd.l[mi], population: sd.p };
+}
+
+function updatePreview() {
+  const state = document.getElementById('state').value;
+  const month = document.getElementById('month').value;
+  const strip = document.getElementById('climate-strip');
+  if (!state || !month) { strip.innerHTML = ''; return; }
+  const d = resolveClimate(state, month);
+  if (!d) { strip.innerHTML = ''; return; }
+  strip.innerHTML = [
+    ['🌡', 'Temp', `${d.temp}°C`],
+    ['💧', 'Humidity', `${d.humidity}%`],
+    ['🌧', 'Rainfall', `${d.rainfall} mm`],
+    ['🌿', 'LAI', `${d.lai}`],
+    ['👥', 'Population', d.population.toLocaleString('en-IN')],
+  ].map(([icon, label, val], i) =>
+    `<span class="chip" style="animation-delay:${i*0.04}s"><span>${icon}</span> ${label}: <strong>${val}</strong></span>`
+  ).join('');
+}
+
+document.getElementById('state').addEventListener('change', updatePreview);
+document.getElementById('month').addEventListener('change', updatePreview);
+
+// ── Validation helpers ───────────────────────────────────────────────────────
+function setFieldError(id, msg) {
+  const el = document.getElementById(id);
+  el.style.borderColor = '#ef4444';
+  el.style.boxShadow = '0 0 0 3px rgba(239,68,68,0.15)';
+  const err = document.getElementById(id + '-err');
+  if (err) { err.textContent = msg; err.style.display = 'block'; }
+}
+
+function clearFieldError(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = '';
+  el.style.boxShadow = '';
+  const err = document.getElementById(id + '-err');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  document.getElementById('error-text').textContent = msg;
+  b.style.display = 'flex';
+}
+
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = on;
+  document.getElementById('btn-label').innerHTML = on
+    ? '<span class="spinner"></span>'
+    : 'Predict Disease Risk';
+}
+
+// ── Chart instance ───────────────────────────────────────────────────────────
+let chartInstance = null;
+
+function renderChart(predictions) {
+  const ctx = document.getElementById('bar-chart').getContext('2d');
+  if (chartInstance) { chartInstance.destroy(); }
+
+  const labels = predictions.map(p => p.disease);
+  const data   = predictions.map(p => +(p.probability * 100).toFixed(1));
+  const colors = predictions.map(p => (DISEASE_COLORS[p.disease] || {}).bar || '#6366f1');
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.map(c => c + 'cc'),
+        borderColor: colors,
+        borderWidth: 1.5,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,23,42,0.95)',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8',
+          padding: 12,
+          callbacks: { label: ctx => ` ${ctx.parsed.y}% probability` }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#64748b', font: { family: 'DM Sans', size: 12 } },
+          border: { display: false }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+          ticks: {
+            color: '#64748b',
+            font: { family: 'DM Sans', size: 11 },
+            callback: v => v + '%'
+          },
+          border: { display: false },
+          max: 100,
+        }
+      }
+    }
+  });
+}
+
+// ── Display results ──────────────────────────────────────────────────────────
+function displayResults(data) {
+  const wrap = document.getElementById('results-wrap');
+
+  // Re-trigger animations
+  wrap.style.display = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.gap = '12px';
+  void wrap.offsetWidth;
+
+  // Summary
+  const top = data.predictions[0];
+  document.getElementById('r-disease').textContent = top.disease;
+  document.getElementById('r-prob').textContent = `${(top.probability * 100).toFixed(1)}% confidence`;
+
+  const riskEl = document.getElementById('r-risk');
+  riskEl.className = 'risk-badge';
+  if (data.risk_level === 'High') {
+    riskEl.classList.add('risk-high');
+    riskEl.textContent = '⚠ High Risk';
+  } else if (data.risk_level === 'Medium') {
+    riskEl.classList.add('risk-medium');
+    riskEl.textContent = '◈ Medium Risk';
+  } else {
+    riskEl.classList.add('risk-low');
+    riskEl.textContent = '✓ Low Risk';
+  }
+
+  // Probability bars (top 3)
+  const top3 = data.predictions.slice(0, 3);
+  const probsList = document.getElementById('probs-list');
+  probsList.innerHTML = top3.map(p => {
+    const pct = (p.probability * 100).toFixed(1);
+    const col = (DISEASE_COLORS[p.disease] || {}).bar || '#6366f1';
+    return `
+      <div class="prob-item">
+        <div class="prob-header">
+          <span class="prob-disease-name">${p.disease}</span>
+          <span class="prob-pct">${pct}%</span>
+        </div>
+        <div class="prob-track">
+          <div class="prob-fill" data-width="${pct}" style="background:${col};"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Animate bars after a tick
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.prob-fill').forEach(el => {
+      el.style.width = el.dataset.width + '%';
+    });
+  });
+
+  // Suggestions
+  const suggs = data.suggestions || (SUGGESTIONS[top.disease] || []);
+  document.getElementById('suggestions-list').innerHTML = suggs.map((s, i) => {
+    const icon = typeof s === 'object' ? s.icon : '💡';
+    const text = typeof s === 'object' ? s.text : s;
+    return `
+      <div class="suggestion-item" style="animation-delay:${i * 0.06}s">
+        <span class="suggestion-icon">${icon}</span>
+        <span>${text}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Chart
+  renderChart(data.predictions);
+
+  // Smooth scroll to results
+  setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+// ── Main prediction function ─────────────────────────────────────────────────
+// async function runPrediction() {
+//   // Clear previous errors/results
+//   clearFieldError('state');
+//   clearFieldError('month');
+//   hideError();
+
+//   const stateEl = document.getElementById('state');
+//   const monthEl = document.getElementById('month');
+//   const state   = stateEl.value.trim();
+//   const month   = monthEl.value.trim();
+
+//   let valid = true;
+//   if (!state) { setFieldError('state', 'Please select a state.'); valid = false; }
+//   if (!month) { setFieldError('month', 'Please select a month.'); valid = false; }
+//   if (!valid) return;
+
+//   const climate = resolveClimate(state, month);
+//   if (!climate) {
+//     showError(`Climate data not available for "${state}". Please try another state.`);
+//     return;
+//   }
+
+//   setLoading(true);
+
+//   // Build request payload matching your Flask backend
+//   const payload = {
+//     state:       state,
+//     month:       month,
+//     temperature: climate.temp,
+//     humidity:    climate.humidity,
+//     rainfall:    climate.rainfall,
+//     lai:         climate.lai,
+//     population:  climate.population,
+//   };
+
+//   try {
+//     const response = await fetch('/predict', {
+//       method:  'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body:    JSON.stringify(payload),
+//     });
+
+//     if (!response.ok) {
+//       // Try to read error detail from backend
+//       let detail = `Server error (${response.status})`;
+//       try { const j = await response.json(); detail = j.error || detail; } catch {}
+//       throw new Error(detail);
+//     }
+
+//     const data = await response.json();
+
+//     /*
+//       Expected backend response shape:
+//       {
+//         predictions: [
+//           { disease: "Dengue",     probability: 0.62 },
+//           { disease: "Malaria",    probability: 0.21 },
+//           { disease: "Typhoid",    probability: 0.10 },
+//           { disease: "Cholera",    probability: 0.05 },
+//           { disease: "Heatstroke", probability: 0.02 }
+//         ],
+//         risk_level: "High",          // "Low" | "Medium" | "High"
+//         suggestions: [...]           // optional — falls back to built-in library
+//       }
+
+//       Also handles flat format:
+//       { top_disease, probability, risk_level, suggestions }
+//     */
+
+//     // ── Normalise response formats ──────────────────────────────────────────
+//     let normalised = data;
+
+//     // Flat format compat (top_disease + probability)
+//     if (!data.predictions && data.top_disease) {
+//       normalised = {
+//         predictions: [{ disease: data.top_disease, probability: data.probability || 0.7 }],
+//         risk_level:  data.risk_level || deriveRiskLevel(data.probability || 0.7),
+//         suggestions: data.suggestions || null,
+//       };
+//     }
+
+//     // Ensure predictions array is sorted descending
+//     if (normalised.predictions) {
+//       normalised.predictions.sort((a, b) => b.probability - a.probability);
+//     }
+
+//     // If no risk_level provided, derive from top probability
+//     if (!normalised.risk_level) {
+//       normalised.risk_level = deriveRiskLevel(normalised.predictions[0].probability);
+//     }
+
+//     displayResults(normalised);
+
+//   } catch (err) {
+//     console.error('Prediction error:', err);
+//     showError(err.message || 'Could not reach the prediction server. Make sure Flask is running on port 5000.');
+//   } finally {
+//     setLoading(false);
+//   }
+// }
+
+async function runPrediction() {
+  clearFieldError('state');
+  clearFieldError('month');
+  hideError();
+
+  const state = document.getElementById('state').value.trim();
+  const month = document.getElementById('month').value.trim();
+
+  if (!state || !month) {
+    if (!state) setFieldError('state', 'Please select a state.');
+    if (!month) setFieldError('month', 'Please select a month.');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await fetch('http://127.0.0.1:5000/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state, month })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error || `Server error (${response.status})`);
+    }
+
+    // Normalize backend response
+    const predictions = data.predictions.map(p => ({
+      disease: p.disease,
+      probability: p.probability / 100   // FIX: backend gives 0–100
+    }));
+
+    const normalised = {
+      predictions,
+      risk_level: data.confidence_level,
+      suggestions: predictions[0]?.suggestions || []
+    };
+
+    displayResults(normalised);
+
+  } catch (err) {
+    console.error(err);
+    showError(err.message || "Backend not responding. Is Flask running?");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function deriveRiskLevel(probability) {
+  if (probability >= 0.65) return 'High';
+  if (probability >= 0.40) return 'Medium';
+  return 'Low';
+}
+</script>
+</body>
+</html>
